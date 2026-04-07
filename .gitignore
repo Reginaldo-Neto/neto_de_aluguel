@@ -43,3 +43,10 @@ app.*.map.json
 /android/app/debug
 /android/app/profile
 /android/app/release
+
+lib/config/supabase_config.dart
+.env
+*.env
+.env.*
+
+.claude/settings.local.json
