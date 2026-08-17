@@ -1,9 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
+import 'package:flutter_hooks/flutter_hooks.dart';
 import 'package:go_router/go_router.dart';
+import '../app.dart';
 import '../models/user.dart';
 import '../models/session.dart';
+import '../models/category.dart';
 import '../presenters/home_presenter.dart';
+import '../services/supabase_service.dart';
 import '../widgets/helper_card.dart';
 import '../widgets/category_chip.dart';
 
@@ -33,6 +37,7 @@ class _ElderHome extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final homeState = ref.watch(homeProvider);
     final homeNotifier = ref.read(homeProvider.notifier);
+    final themeMode = ref.watch(themeModeProvider);
     final theme = Theme.of(context);
 
     return Scaffold(
@@ -52,6 +57,16 @@ class _ElderHome extends ConsumerWidget {
         ),
         actions: [
           IconButton(
+            icon: Icon(themeMode == ThemeMode.dark
+                ? Icons.light_mode_rounded
+                : Icons.dark_mode_rounded),
+            tooltip: 'Alternar tema',
+            onPressed: () {
+              ref.read(themeModeProvider.notifier).state =
+                  themeMode == ThemeMode.dark ? ThemeMode.light : ThemeMode.dark;
+            },
+          ),
+          IconButton(
             icon: const Icon(Icons.logout_rounded),
             onPressed: () async {
               await ref.read(authProvider.notifier).signOut();
@@ -65,7 +80,9 @@ class _ElderHome extends ConsumerWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const SizedBox(height: 8),
+            _InstantCallBanner(
+              onCall: () => _startInstantMatch(context, ref),
+            ),
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 16),
               child: Text('Categorias',
@@ -86,11 +103,11 @@ class _ElderHome extends ConsumerWidget {
                   Text(
                     homeState.activeCategory != null
                         ? homeState.activeCategory!
-                        : 'Todos os ajudantes',
+                        : 'Voluntários disponíveis',
                     style: theme.textTheme.titleMedium
                         ?.copyWith(fontWeight: FontWeight.bold),
                   ),
-                  Text('${homeState.helpers.length} disponíveis',
+                  Text('${homeState.helpers.length} online',
                       style: TextStyle(
                           color: theme.colorScheme.onSurfaceVariant,
                           fontSize: 13)),
@@ -112,13 +129,166 @@ class _ElderHome extends ConsumerWidget {
                             final helper = homeState.helpers[index];
                             return HelperCard(
                               helper: helper,
-                              onTap: () =>
-                                  context.push('/session/${helper.id}',
-                                      extra: helper),
+                              onTap: () => context.push(
+                                  '/session/${helper.id}',
+                                  extra: helper),
+                              onCall: () =>
+                                  _callSpecificHelper(context, ref, helper),
                             );
                           },
                         ),
             ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+Future<void> _startInstantMatch(BuildContext context, WidgetRef ref) async {
+  showDialog(
+    context: context,
+    barrierDismissible: false,
+    builder: (_) => const _MatchingDialog(),
+  );
+
+  // Busca fresca no Supabase — ignora cache local
+  final helpers = await SupabaseService().getHelpers();
+
+  if (!context.mounted) return;
+  Navigator.of(context).pop();
+
+  if (helpers.isEmpty) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text('Nenhum voluntário online no momento. Tente em breve!'),
+        behavior: SnackBarBehavior.floating,
+      ),
+    );
+    return;
+  }
+
+  final helper = helpers.first;
+  final user = ref.read(authProvider)!;
+  final session = SessionModel(
+    id: 'instant_${DateTime.now().millisecondsSinceEpoch}',
+    elderId: user.id,
+    helperId: helper.id,
+    scheduledAt: DateTime.now(),
+    category: 'Geral',
+    status: SessionStatus.confirmed,
+    helper: helper,
+    elder: user,
+  );
+
+  if (context.mounted) {
+    context.push('/video-call/${session.id}', extra: session);
+  }
+}
+
+void _callSpecificHelper(
+    BuildContext context, WidgetRef ref, UserModel helper) {
+  final user = ref.read(authProvider)!;
+  final session = SessionModel(
+    id: 'direct_${helper.id}_${DateTime.now().millisecondsSinceEpoch}',
+    elderId: user.id,
+    helperId: helper.id,
+    scheduledAt: DateTime.now(),
+    category:
+        helper.categories.where((c) => c != 'Geral').isNotEmpty
+            ? helper.categories.where((c) => c != 'Geral').first
+            : 'Geral',
+    status: SessionStatus.confirmed,
+    helper: helper,
+    elder: user,
+  );
+  context.push('/video-call/${session.id}', extra: session);
+}
+
+class _InstantCallBanner extends StatelessWidget {
+  final VoidCallback onCall;
+  const _InstantCallBanner({required this.onCall});
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return Container(
+      margin: const EdgeInsets.fromLTRB(16, 4, 16, 16),
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          colors: [theme.colorScheme.primary, theme.colorScheme.tertiary],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
+        borderRadius: BorderRadius.circular(20),
+      ),
+      child: Row(
+        children: [
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Precisa de ajuda agora?',
+                  style: theme.textTheme.titleMedium?.copyWith(
+                    color: Colors.white,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  'Conectamos você com um voluntário disponível em segundos.',
+                  style: theme.textTheme.bodySmall
+                      ?.copyWith(color: Colors.white70),
+                ),
+                const SizedBox(height: 14),
+                ElevatedButton.icon(
+                  onPressed: onCall,
+                  icon: const Icon(Icons.phone_rounded, size: 18),
+                  label: const Text('Ligar agora'),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Colors.white,
+                    foregroundColor: theme.colorScheme.primary,
+                    elevation: 0,
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 20, vertical: 10),
+                    minimumSize: Size.zero,
+                    textStyle: const TextStyle(
+                        fontSize: 14, fontWeight: FontWeight.bold),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(width: 12),
+          const Text('📞', style: TextStyle(fontSize: 52)),
+        ],
+      ),
+    );
+  }
+}
+
+class _MatchingDialog extends StatelessWidget {
+  const _MatchingDialog();
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return Dialog(
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+      child: Padding(
+        padding: const EdgeInsets.all(32),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const CircularProgressIndicator(),
+            const SizedBox(height: 20),
+            Text('Buscando voluntário...',
+                style: theme.textTheme.titleMedium
+                    ?.copyWith(fontWeight: FontWeight.bold)),
+            const SizedBox(height: 8),
+            Text('Aguarde um momento', style: theme.textTheme.bodySmall),
           ],
         ),
       ),
@@ -135,7 +305,7 @@ class _EmptyHelpers extends StatelessWidget {
         children: [
           const Text('🔍', style: TextStyle(fontSize: 48)),
           const SizedBox(height: 12),
-          Text('Nenhum ajudante nessa categoria',
+          Text('Nenhum voluntário nessa categoria',
               style: Theme.of(context).textTheme.bodyLarge),
         ],
       ),
@@ -154,6 +324,7 @@ class _HelperHome extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final sessions = ref.watch(userSessionsProvider);
+    final themeMode = ref.watch(themeModeProvider);
     final theme = Theme.of(context);
 
     return Scaffold(
@@ -167,7 +338,7 @@ class _HelperHome extends ConsumerWidget {
             Text('Olá, ${user.name.split(' ').first}! 👋',
                 style: const TextStyle(
                     fontSize: 20, fontWeight: FontWeight.bold)),
-            Text('Suas sessões agendadas',
+            Text('Suas conversas agendadas',
                 style: TextStyle(
                     fontSize: 13,
                     color: theme.colorScheme.onSurfaceVariant)),
@@ -175,6 +346,21 @@ class _HelperHome extends ConsumerWidget {
         ),
         actions: [
           _AvailabilityToggle(user: user),
+          IconButton(
+            icon: const Icon(Icons.category_outlined),
+            tooltip: 'Minhas especialidades',
+            onPressed: () => _showCategorySetup(context, ref, user),
+          ),
+          IconButton(
+            icon: Icon(themeMode == ThemeMode.dark
+                ? Icons.light_mode_rounded
+                : Icons.dark_mode_rounded),
+            tooltip: 'Alternar tema',
+            onPressed: () {
+              ref.read(themeModeProvider.notifier).state =
+                  themeMode == ThemeMode.dark ? ThemeMode.light : ThemeMode.dark;
+            },
+          ),
           IconButton(
             icon: const Icon(Icons.logout_rounded),
             onPressed: () async {
@@ -187,6 +373,10 @@ class _HelperHome extends ConsumerWidget {
       body: Column(
         children: [
           _StatsRow(user: user),
+          if (user.categories.isEmpty || user.categories.every((c) => c == 'Geral'))
+            _NoCategoriesBanner(
+              onTap: () => _showCategorySetup(context, ref, user),
+            ),
           const SizedBox(height: 8),
           Expanded(
             child: sessions.when(
@@ -206,6 +396,160 @@ class _HelperHome extends ConsumerWidget {
             ),
           ),
         ],
+      ),
+    );
+  }
+}
+
+void _showCategorySetup(BuildContext context, WidgetRef ref, UserModel user) {
+  showModalBottomSheet(
+    context: context,
+    isScrollControlled: true,
+    shape: const RoundedRectangleBorder(
+      borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+    ),
+    builder: (_) => _CategorySetupSheet(user: user),
+  );
+}
+
+class _CategorySetupSheet extends HookConsumerWidget {
+  final UserModel user;
+  const _CategorySetupSheet({required this.user});
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final specialCategories =
+        mockCategories.where((c) => c.name != 'Geral').toList();
+    final selected = useState<Set<String>>(
+        Set.from(user.categories.where((c) => c != 'Geral')));
+    final isLoading = useState(false);
+
+    Future<void> save() async {
+      isLoading.value = true;
+      final categories = selected.value.toList();
+      await SupabaseService().updateCategories(user.id, categories);
+      ref.read(authProvider.notifier).setCategories(categories);
+      isLoading.value = false;
+      if (context.mounted) Navigator.of(context).pop();
+    }
+
+    return DraggableScrollableSheet(
+      initialChildSize: 0.75,
+      maxChildSize: 0.95,
+      minChildSize: 0.5,
+      expand: false,
+      builder: (_, scrollController) {
+        return Padding(
+          padding: EdgeInsets.fromLTRB(
+              24, 16, 24, MediaQuery.of(context).viewInsets.bottom + 24),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Center(
+                child: Container(
+                  width: 40,
+                  height: 4,
+                  decoration: BoxDecoration(
+                    color: Colors.grey.shade300,
+                    borderRadius: BorderRadius.circular(2),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 20),
+              Text('Minhas especialidades',
+                  style: Theme.of(context)
+                      .textTheme
+                      .titleLarge
+                      ?.copyWith(fontWeight: FontWeight.bold)),
+              const SizedBox(height: 8),
+              Text(
+                'Você já aparece na categoria "Geral" automaticamente. '
+                'Selecione suas especialidades para aparecer em mais categorias.',
+                style: Theme.of(context).textTheme.bodySmall,
+              ),
+              const SizedBox(height: 16),
+              Expanded(
+                child: ListView(
+                  controller: scrollController,
+                  children: specialCategories.map((cat) {
+                    final isSelected = selected.value.contains(cat.name);
+                    return CheckboxListTile(
+                      title: Text('${cat.emoji}  ${cat.name}',
+                          style: const TextStyle(fontWeight: FontWeight.w500)),
+                      subtitle: Text(cat.description),
+                      value: isSelected,
+                      activeColor: cat.color,
+                      shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12)),
+                      onChanged: (v) {
+                        final newSet = Set<String>.from(selected.value);
+                        if (v == true) {
+                          newSet.add(cat.name);
+                        } else {
+                          newSet.remove(cat.name);
+                        }
+                        selected.value = newSet;
+                      },
+                    );
+                  }).toList(),
+                ),
+              ),
+              const SizedBox(height: 16),
+              SizedBox(
+                width: double.infinity,
+                height: 52,
+                child: FilledButton(
+                  onPressed: isLoading.value ? null : save,
+                  child: isLoading.value
+                      ? const SizedBox(
+                          width: 20,
+                          height: 20,
+                          child: CircularProgressIndicator(
+                              color: Colors.white, strokeWidth: 2))
+                      : const Text('Salvar especialidades'),
+                ),
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+}
+
+class _NoCategoriesBanner extends StatelessWidget {
+  final VoidCallback onTap;
+  const _NoCategoriesBanner({required this.onTap});
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        margin: const EdgeInsets.fromLTRB(16, 8, 16, 0),
+        padding: const EdgeInsets.all(14),
+        decoration: BoxDecoration(
+          color: theme.colorScheme.secondaryContainer,
+          borderRadius: BorderRadius.circular(14),
+        ),
+        child: Row(
+          children: [
+            Icon(Icons.info_outline_rounded,
+                color: theme.colorScheme.onSecondaryContainer, size: 20),
+            const SizedBox(width: 10),
+            Expanded(
+              child: Text(
+                'Adicione suas especialidades para aparecer em mais categorias.',
+                style: TextStyle(
+                    color: theme.colorScheme.onSecondaryContainer,
+                    fontSize: 13),
+              ),
+            ),
+            Icon(Icons.chevron_right_rounded,
+                color: theme.colorScheme.onSecondaryContainer),
+          ],
+        ),
       ),
     );
   }
@@ -261,10 +605,12 @@ class _StatsRow extends StatelessWidget {
           _Stat(
               label: 'Avaliação',
               value: '⭐ ${user.rating.toStringAsFixed(1)}'),
-          _Stat(label: 'Sessões', value: '${user.totalSessions}'),
-          _Stat(
-              label: 'Taxa/hora',
-              value: 'R\$ ${user.hourlyRate?.toStringAsFixed(0) ?? '-'}'),
+          Container(
+              width: 1,
+              height: 36,
+              color: theme.colorScheme.onPrimaryContainer
+                  .withValues(alpha: 0.2)),
+          _Stat(label: 'Atendimentos', value: '${user.totalSessions}'),
         ],
       ),
     );
@@ -283,7 +629,12 @@ class _Stat extends StatelessWidget {
         Text(value,
             style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
         Text(label,
-            style: const TextStyle(fontSize: 12, color: Colors.black54)),
+            style: TextStyle(
+                fontSize: 12,
+                color: Theme.of(context)
+                    .colorScheme
+                    .onPrimaryContainer
+                    .withValues(alpha: 0.7))),
       ],
     );
   }
@@ -311,10 +662,11 @@ class _SessionCard extends StatelessWidget {
           backgroundColor: theme.colorScheme.secondaryContainer,
           child: Text(
             session.elder?.initials ?? '?',
-            style: TextStyle(color: theme.colorScheme.onSecondaryContainer),
+            style:
+                TextStyle(color: theme.colorScheme.onSecondaryContainer),
           ),
         ),
-        title: Text(session.elder?.name ?? 'Idoso',
+        title: Text(session.elder?.name ?? 'Participante',
             style: const TextStyle(fontWeight: FontWeight.bold)),
         subtitle: Text(
           '${session.category} · ${_formatDate(session.scheduledAt)}',
@@ -328,7 +680,7 @@ class _SessionCard extends StatelessWidget {
                 ),
                 child: const Text('Entrar'),
               )
-            : _StatusBadge(status: session.status),
+            : _StatusBadgeSession(status: session.status),
       ),
     );
   }
@@ -338,9 +690,9 @@ class _SessionCard extends StatelessWidget {
   }
 }
 
-class _StatusBadge extends StatelessWidget {
+class _StatusBadgeSession extends StatelessWidget {
   final SessionStatus status;
-  const _StatusBadge({required this.status});
+  const _StatusBadgeSession({required this.status});
 
   @override
   Widget build(BuildContext context) {
@@ -386,7 +738,7 @@ class _NoSessions extends StatelessWidget {
         children: [
           const Text('📅', style: TextStyle(fontSize: 48)),
           const SizedBox(height: 12),
-          Text('Nenhuma sessão agendada',
+          Text('Nenhuma conversa agendada',
               style: Theme.of(context).textTheme.bodyLarge),
           const SizedBox(height: 8),
           Text('Quando alguém agendar com você, aparecerá aqui.',

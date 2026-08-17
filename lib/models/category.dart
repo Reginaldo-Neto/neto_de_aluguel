@@ -18,6 +18,13 @@ class CategoryModel {
 
 const mockCategories = [
   CategoryModel(
+    id: 'general',
+    name: 'Geral',
+    emoji: '🌟',
+    description: 'Todos os voluntários disponíveis',
+    color: Color(0xFF6750A4),
+  ),
+  CategoryModel(
     id: 'companionship',
     name: 'Companhia',
     emoji: '💬',
