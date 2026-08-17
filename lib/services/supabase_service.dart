@@ -151,4 +151,44 @@ class SupabaseService {
 
     return SessionModel.fromJson(data).copyWith2(helper: helper);
   }
+
+  /// Cria uma sessão imediata (ligação instantânea ou direta) já em andamento
+  /// e persiste no banco, retornando a sessão com id real e perfis anexados.
+  Future<SessionModel> createImmediateSession({
+    required String elderId,
+    required String helperId,
+    required String category,
+  }) async {
+    final Map<String, dynamic> data = await _db
+        .from('sessions')
+        .insert({
+          'elder_id': elderId,
+          'helper_id': helperId,
+          'scheduled_at': DateTime.now().toUtc().toIso8601String(),
+          'category': category,
+          'duration_minutes': 60,
+          'status': SessionStatus.inProgress.name,
+        })
+        .select('*, helper:profiles!helper_id(*), elder:profiles!elder_id(*)')
+        .single();
+
+    UserModel? helper;
+    UserModel? elder;
+    if (data['helper'] != null) {
+      helper = UserModel.fromJson({...data['helper'], 'email': ''});
+    }
+    if (data['elder'] != null) {
+      elder = UserModel.fromJson({...data['elder'], 'email': ''});
+    }
+
+    return SessionModel.fromJson(data).copyWith2(helper: helper, elder: elder);
+  }
+
+  /// Marca uma sessão como concluída (chamado ao encerrar a videochamada).
+  Future<void> completeSession(String sessionId) async {
+    await _db
+        .from('sessions')
+        .update({'status': SessionStatus.completed.name})
+        .eq('id', sessionId);
+  }
 }

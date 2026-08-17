@@ -6,6 +6,7 @@ import 'package:go_router/go_router.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../models/session.dart';
 import '../services/video_service.dart';
+import '../services/supabase_service.dart';
 import '../presenters/home_presenter.dart';
 
 // SDK do Jitsi só existe em Android/iOS — importamos condicionalmente
@@ -20,6 +21,18 @@ class VideoCallView extends HookConsumerWidget {
     final user = ref.read(authProvider);
     final roomName = VideoService().roomName(session.id);
     final launched = useState(false);
+
+    // Ao encerrar a chamada: marca a sessão como concluída, atualiza o
+    // histórico e volta para a home.
+    Future<void> finishSession() async {
+      try {
+        await SupabaseService().completeSession(session.id);
+      } catch (_) {}
+      if (context.mounted) {
+        ref.invalidate(userSessionsProvider);
+        context.go('/home');
+      }
+    }
 
     useEffect(() {
       WidgetsBinding.instance.addPostFrameCallback((_) async {
@@ -37,7 +50,7 @@ class VideoCallView extends HookConsumerWidget {
             displayName: user?.name ?? 'Participante',
             email: user?.email,
             onEnded: () {
-              if (context.mounted) context.go('/home');
+              finishSession();
             },
           );
         }
@@ -51,7 +64,9 @@ class VideoCallView extends HookConsumerWidget {
       return _WebCallScreen(
         helperName: helperName,
         jitsiUrl: 'https://meet.jit.si/$roomName',
-        onDone: () => context.go('/home'),
+        onDone: () {
+          finishSession();
+        },
       );
     }
 

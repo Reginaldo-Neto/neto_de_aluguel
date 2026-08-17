@@ -48,7 +48,8 @@ class _ElderSessionCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final isUpcoming = session.scheduledAt.isAfter(DateTime.now());
+    final canJoin = session.status == SessionStatus.confirmed ||
+        session.status == SessionStatus.inProgress;
     final helperName = session.helper?.name ?? 'Voluntário';
 
     return Card(
@@ -73,7 +74,7 @@ class _ElderSessionCard extends StatelessWidget {
           '${session.category} · ${_formatDate(session.scheduledAt)}',
           style: const TextStyle(fontSize: 13),
         ),
-        trailing: isUpcoming && session.status != SessionStatus.cancelled
+        trailing: canJoin
             ? FilledButton.tonal(
                 onPressed: () => context.push(
                   '/video-call/${session.id}',

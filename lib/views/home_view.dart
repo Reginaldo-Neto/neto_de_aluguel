@@ -175,39 +175,46 @@ Future<void> _startInstantMatch(BuildContext context, WidgetRef ref) async {
 
   final helper = helpers.first;
   final user = ref.read(authProvider)!;
-  final session = SessionModel(
-    id: 'instant_${DateTime.now().millisecondsSinceEpoch}',
-    elderId: user.id,
-    helperId: helper.id,
-    scheduledAt: DateTime.now(),
-    category: 'Geral',
-    status: SessionStatus.confirmed,
-    helper: helper,
-    elder: user,
-  );
-
-  if (context.mounted) {
-    context.push('/video-call/${session.id}', extra: session);
-  }
+  await _startCall(context, ref, helper: helper, category: 'Geral', user: user);
 }
 
-void _callSpecificHelper(
-    BuildContext context, WidgetRef ref, UserModel helper) {
+Future<void> _callSpecificHelper(
+    BuildContext context, WidgetRef ref, UserModel helper) async {
   final user = ref.read(authProvider)!;
-  final session = SessionModel(
-    id: 'direct_${helper.id}_${DateTime.now().millisecondsSinceEpoch}',
-    elderId: user.id,
-    helperId: helper.id,
-    scheduledAt: DateTime.now(),
-    category:
-        helper.categories.where((c) => c != 'Geral').isNotEmpty
-            ? helper.categories.where((c) => c != 'Geral').first
-            : 'Geral',
-    status: SessionStatus.confirmed,
-    helper: helper,
-    elder: user,
-  );
-  context.push('/video-call/${session.id}', extra: session);
+  final category = helper.categories.where((c) => c != 'Geral').isNotEmpty
+      ? helper.categories.where((c) => c != 'Geral').first
+      : 'Geral';
+  await _startCall(context, ref, helper: helper, category: category, user: user);
+}
+
+/// Persiste a sessão imediata e navega para a videochamada.
+Future<void> _startCall(
+  BuildContext context,
+  WidgetRef ref, {
+  required UserModel helper,
+  required String category,
+  required UserModel user,
+}) async {
+  try {
+    final session = await SupabaseService().createImmediateSession(
+      elderId: user.id,
+      helperId: helper.id,
+      category: category,
+    );
+    ref.invalidate(userSessionsProvider);
+    if (context.mounted) {
+      context.push('/video-call/${session.id}', extra: session);
+    }
+  } catch (_) {
+    if (context.mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Não foi possível iniciar a ligação. Tente novamente.'),
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+    }
+  }
 }
 
 class _InstantCallBanner extends StatelessWidget {
@@ -652,7 +659,8 @@ class _SessionCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final isUpcoming = session.scheduledAt.isAfter(DateTime.now());
+    final canJoin = session.status == SessionStatus.confirmed ||
+        session.status == SessionStatus.inProgress;
 
     return Card(
       elevation: 0,
@@ -677,7 +685,7 @@ class _SessionCard extends StatelessWidget {
           '${session.category} · ${_formatDate(session.scheduledAt)}',
           style: const TextStyle(fontSize: 13),
         ),
-        trailing: isUpcoming
+        trailing: canJoin
             ? FilledButton.tonal(
                 onPressed: () => context.push(
                   '/video-call/${session.id}',
