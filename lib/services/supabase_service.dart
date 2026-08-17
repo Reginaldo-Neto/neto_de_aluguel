@@ -61,24 +61,41 @@ class SupabaseService {
 
   // ──────────────────────────── Helpers ────────────────────────────
 
-  Future<List<UserModel>> getHelpers({String? category}) async {
-    var query = _db
-        .from('profiles')
-        .select()
-        .eq('role', 'helper')
-        .eq('is_available', true)
-        .order('rating', ascending: false);
-
-    final List<dynamic> data = await query;
+  Future<List<UserModel>> getHelpers({String? category, bool onlyAvailable = true}) async {
+    final List<dynamic> data = onlyAvailable
+        ? await _db
+            .from('profiles')
+            .select()
+            .eq('role', 'helper')
+            .eq('is_available', true)
+            .order('rating', ascending: false)
+        : await _db
+            .from('profiles')
+            .select()
+            .eq('role', 'helper')
+            .order('rating', ascending: false);
 
     final helpers = data
         .map((row) => UserModel.fromJson({...row, 'email': ''}))
         .toList();
 
-    if (category != null) {
-      return helpers.where((h) => h.categories.contains(category)).toList();
-    }
-    return helpers;
+    // "Geral" e null mostram todos os helpers
+    if (category == null || category == 'Geral') return helpers;
+    return helpers.where((h) => h.categories.contains(category)).toList();
+  }
+
+  Future<void> updateAvailability(String userId, bool isAvailable) async {
+    await _db
+        .from('profiles')
+        .update({'is_available': isAvailable})
+        .eq('id', userId);
+  }
+
+  Future<void> updateCategories(String userId, List<String> categories) async {
+    await _db
+        .from('profiles')
+        .update({'categories': categories})
+        .eq('id', userId);
   }
 
   // ──────────────────────────── Sessões ────────────────────────────

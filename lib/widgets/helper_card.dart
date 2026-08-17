@@ -4,8 +4,14 @@ import '../models/user.dart';
 class HelperCard extends StatelessWidget {
   final UserModel helper;
   final VoidCallback onTap;
+  final VoidCallback? onCall;
 
-  const HelperCard({super.key, required this.helper, required this.onTap});
+  const HelperCard({
+    super.key,
+    required this.helper,
+    required this.onTap,
+    this.onCall,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -16,52 +22,73 @@ class HelperCard extends StatelessWidget {
         borderRadius: BorderRadius.circular(16),
         side: BorderSide(color: theme.colorScheme.outlineVariant),
       ),
-      child: InkWell(
-        onTap: onTap,
-        borderRadius: BorderRadius.circular(16),
-        child: Padding(
-          padding: const EdgeInsets.all(16),
-          child: Row(
-            children: [
-              _Avatar(helper: helper),
-              const SizedBox(width: 12),
-              Expanded(child: _Info(helper: helper)),
-              Column(
-                crossAxisAlignment: CrossAxisAlignment.end,
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          children: [
+            Row(
+              children: [
+                _Avatar(helper: helper),
+                const SizedBox(width: 12),
+                Expanded(child: _Info(helper: helper)),
+                _StatusBadge(isAvailable: helper.isAvailable),
+              ],
+            ),
+            if (onCall != null) ...[
+              const SizedBox(height: 12),
+              Row(
                 children: [
-                  if (helper.hourlyRate != null)
-                    Text(
-                      'R\$ ${helper.hourlyRate!.toStringAsFixed(0)}/h',
-                      style: TextStyle(
-                        fontWeight: FontWeight.bold,
-                        color: theme.colorScheme.primary,
-                        fontSize: 15,
+                  Expanded(
+                    child: OutlinedButton.icon(
+                      icon: const Icon(Icons.calendar_today_rounded, size: 16),
+                      label: const Text('Agendar'),
+                      onPressed: onTap,
+                      style: OutlinedButton.styleFrom(
+                        minimumSize: const Size(0, 40),
+                        textStyle: const TextStyle(fontSize: 14),
                       ),
                     ),
-                  const SizedBox(height: 8),
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                    decoration: BoxDecoration(
-                      color: helper.isAvailable
-                          ? Colors.green.shade50
-                          : Colors.grey.shade100,
-                      borderRadius: BorderRadius.circular(8),
-                    ),
-                    child: Text(
-                      helper.isAvailable ? 'Disponível' : 'Ocupado',
-                      style: TextStyle(
-                        fontSize: 12,
-                        fontWeight: FontWeight.w600,
-                        color: helper.isAvailable
-                            ? Colors.green.shade700
-                            : Colors.grey.shade600,
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: FilledButton.icon(
+                      icon: const Icon(Icons.phone_rounded, size: 16),
+                      label: const Text('Ligar'),
+                      onPressed: helper.isAvailable ? onCall : null,
+                      style: FilledButton.styleFrom(
+                        minimumSize: const Size(0, 40),
+                        textStyle: const TextStyle(fontSize: 14),
                       ),
                     ),
                   ),
                 ],
               ),
             ],
-          ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _StatusBadge extends StatelessWidget {
+  final bool isAvailable;
+  const _StatusBadge({required this.isAvailable});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+      decoration: BoxDecoration(
+        color: isAvailable ? Colors.green.shade50 : Colors.grey.shade100,
+        borderRadius: BorderRadius.circular(8),
+      ),
+      child: Text(
+        isAvailable ? 'Online' : 'Offline',
+        style: TextStyle(
+          fontSize: 12,
+          fontWeight: FontWeight.w600,
+          color: isAvailable ? Colors.green.shade700 : Colors.grey.shade600,
         ),
       ),
     );
@@ -129,24 +156,27 @@ class _Info extends StatelessWidget {
             const Icon(Icons.star_rounded, color: Colors.amber, size: 16),
             const SizedBox(width: 2),
             Text(
-              '${helper.rating.toStringAsFixed(1)} · ${helper.totalSessions} sessões',
+              '${helper.rating.toStringAsFixed(1)} · ${helper.totalSessions} atendimentos',
               style: const TextStyle(fontSize: 13, color: Colors.grey),
             ),
           ],
         ),
-        const SizedBox(height: 6),
-        Wrap(
-          spacing: 4,
-          children: helper.categories
-              .take(2)
-              .map((c) => Chip(
-                    label: Text(c, style: const TextStyle(fontSize: 11)),
-                    padding: EdgeInsets.zero,
-                    visualDensity: VisualDensity.compact,
-                    materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                  ))
-              .toList(),
-        ),
+        if (helper.categories.isNotEmpty) ...[
+          const SizedBox(height: 6),
+          Wrap(
+            spacing: 4,
+            children: helper.categories
+                .where((c) => c != 'Geral')
+                .take(2)
+                .map((c) => Chip(
+                      label: Text(c, style: const TextStyle(fontSize: 11)),
+                      padding: EdgeInsets.zero,
+                      visualDensity: VisualDensity.compact,
+                      materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                    ))
+                .toList(),
+          ),
+        ],
       ],
     );
   }

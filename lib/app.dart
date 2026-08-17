@@ -9,6 +9,8 @@ import 'views/home_view.dart';
 import 'views/session_view.dart';
 import 'views/video_call_view.dart';
 
+final themeModeProvider = StateProvider<ThemeMode>((ref) => ThemeMode.system);
+
 final _rootNavigatorKey = GlobalKey<NavigatorState>();
 
 GoRouter _buildRouter(UserModel? currentUser) {
@@ -43,11 +45,13 @@ class NetoDeAluguelApp extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final currentUser = ref.watch(authProvider);
+    final themeMode = ref.watch(themeModeProvider);
     return MaterialApp.router(
       title: 'Neto de Aluguel',
       debugShowCheckedModeBanner: false,
       theme: _buildTheme(Brightness.light),
       darkTheme: _buildTheme(Brightness.dark),
+      themeMode: themeMode,
       routerConfig: _buildRouter(currentUser),
     );
   }

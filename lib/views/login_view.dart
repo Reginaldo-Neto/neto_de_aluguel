@@ -63,7 +63,7 @@ class LoginView extends HookConsumerWidget {
                   ],
                   _Field(
                     controller: emailCtrl,
-                    label: 'E-mail',
+                    label: 'E-mail institucional',
                     icon: Icons.email_outlined,
                     keyboardType: TextInputType.emailAddress,
                     validator: (v) =>
@@ -130,7 +130,7 @@ class _Logo extends StatelessWidget {
                 fontWeight: FontWeight.bold,
                 color: theme.colorScheme.primary)),
         const SizedBox(height: 6),
-        Text('Ajuda e companhia com um clique',
+        Text('Projeto de extensão universitária',
             style: theme.textTheme.bodyMedium
                 ?.copyWith(color: theme.colorScheme.onSurfaceVariant)),
       ],
@@ -150,24 +150,22 @@ class _RoleSelector extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text('Eu sou...', style: theme.textTheme.titleMedium),
+        Text('Como você quer participar?', style: theme.textTheme.titleMedium),
+        const SizedBox(height: 12),
+        _RoleOption(
+          label: 'Preciso de ajuda',
+          subtitle: 'Quero conversar com um voluntário',
+          emoji: '🙋',
+          selected: selected == UserRole.elder,
+          onTap: () => onSelect(UserRole.elder),
+        ),
         const SizedBox(height: 10),
-        Row(
-          children: [
-            _RoleOption(
-              label: 'Idoso',
-              emoji: '👴',
-              selected: selected == UserRole.elder,
-              onTap: () => onSelect(UserRole.elder),
-            ),
-            const SizedBox(width: 12),
-            _RoleOption(
-              label: 'Ajudante',
-              emoji: '🤝',
-              selected: selected == UserRole.helper,
-              onTap: () => onSelect(UserRole.helper),
-            ),
-          ],
+        _RoleOption(
+          label: 'Quero ajudar',
+          subtitle: 'Sou aluno voluntário da extensão',
+          emoji: '🤝',
+          selected: selected == UserRole.helper,
+          onTap: () => onSelect(UserRole.helper),
         ),
       ],
     );
@@ -176,12 +174,14 @@ class _RoleSelector extends StatelessWidget {
 
 class _RoleOption extends StatelessWidget {
   final String label;
+  final String subtitle;
   final String emoji;
   final bool selected;
   final VoidCallback onTap;
 
   const _RoleOption({
     required this.label,
+    required this.subtitle,
     required this.emoji,
     required this.selected,
     required this.onTap,
@@ -190,37 +190,54 @@ class _RoleOption extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    return Expanded(
-      child: GestureDetector(
-        onTap: onTap,
-        child: AnimatedContainer(
-          duration: const Duration(milliseconds: 200),
-          padding: const EdgeInsets.symmetric(vertical: 16),
-          decoration: BoxDecoration(
-            color: selected
-                ? theme.colorScheme.primaryContainer
-                : theme.colorScheme.surfaceContainerHighest,
-            borderRadius: BorderRadius.circular(14),
-            border: Border.all(
-              color: selected
-                  ? theme.colorScheme.primary
-                  : Colors.transparent,
-              width: 2,
+    return GestureDetector(
+      onTap: onTap,
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 200),
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+        decoration: BoxDecoration(
+          color: selected
+              ? theme.colorScheme.primaryContainer
+              : theme.colorScheme.surfaceContainerHighest,
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(
+            color: selected ? theme.colorScheme.primary : Colors.transparent,
+            width: 2,
+          ),
+        ),
+        child: Row(
+          children: [
+            Text(emoji, style: const TextStyle(fontSize: 32)),
+            const SizedBox(width: 16),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    label,
+                    style: TextStyle(
+                      fontWeight: FontWeight.bold,
+                      fontSize: 16,
+                      color: selected
+                          ? theme.colorScheme.primary
+                          : theme.colorScheme.onSurface,
+                    ),
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    subtitle,
+                    style: TextStyle(
+                      fontSize: 13,
+                      color: theme.colorScheme.onSurfaceVariant,
+                    ),
+                  ),
+                ],
+              ),
             ),
-          ),
-          child: Column(
-            children: [
-              Text(emoji, style: const TextStyle(fontSize: 28)),
-              const SizedBox(height: 6),
-              Text(label,
-                  style: TextStyle(
-                    fontWeight: FontWeight.bold,
-                    color: selected
-                        ? theme.colorScheme.primary
-                        : theme.colorScheme.onSurface,
-                  )),
-            ],
-          ),
+            if (selected)
+              Icon(Icons.check_circle_rounded,
+                  color: theme.colorScheme.primary, size: 22),
+          ],
         ),
       ),
     );

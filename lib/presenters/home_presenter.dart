@@ -17,9 +17,16 @@ class AuthNotifier extends Notifier<UserModel?> {
     state = null;
   }
 
-  void toggleAvailability() {
+  Future<void> toggleAvailability() async {
     if (state == null) return;
-    state = state!.copyWith(isAvailable: !state!.isAvailable);
+    final newValue = !state!.isAvailable;
+    state = state!.copyWith(isAvailable: newValue);
+    await SupabaseService().updateAvailability(state!.id, newValue);
+  }
+
+  void setCategories(List<String> categories) {
+    if (state == null) return;
+    state = state!.copyWith(categories: categories);
   }
 }
 

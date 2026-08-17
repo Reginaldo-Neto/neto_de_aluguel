@@ -1,18 +1,9 @@
-/// Serviço de videochamada via Daily.co.
-/// No protótipo retorna tokens mockados.
+/// Serviço de videochamada via Jitsi Meet (gratuito, open source).
 class VideoService {
-  static const bool _useMock = true;
-
-  Future<String> createRoomToken({required String sessionId}) async {
-    if (_useMock) {
-      await Future.delayed(const Duration(milliseconds: 500));
-      return 'mock-token-$sessionId-${DateTime.now().millisecondsSinceEpoch}';
-    }
-    // TODO: implementar criação de sala no Daily.co
-    throw UnimplementedError();
-  }
-
-  Future<void> endCall({required String sessionId}) async {
-    await Future.delayed(const Duration(milliseconds: 300));
+  /// Gera o nome da sala Jitsi a partir do ID da sessão.
+  /// O nome precisa ser o mesmo nos dois lados para que entrem na mesma sala.
+  String roomName(String sessionId) {
+    final clean = sessionId.replaceAll(RegExp(r'[^a-zA-Z0-9]'), '');
+    return 'netoaluguel$clean';
   }
 }

@@ -74,12 +74,6 @@ class SessionView extends ConsumerWidget {
               ),
             ],
             const SizedBox(height: 32),
-            if (helper.hourlyRate != null)
-              _PriceSummary(
-                hourlyRate: helper.hourlyRate!,
-                durationMinutes: state.selectedDuration,
-              ),
-            const SizedBox(height: 16),
             PrimaryButton(
               label: 'Confirmar agendamento',
               onPressed: state.canBook ? notifier.bookSession : null,
@@ -295,41 +289,6 @@ class _DurationSelector extends StatelessWidget {
           onSelected: (_) => onSelect(min),
         );
       }).toList(),
-    );
-  }
-}
-
-class _PriceSummary extends StatelessWidget {
-  final double hourlyRate;
-  final int durationMinutes;
-
-  const _PriceSummary(
-      {required this.hourlyRate, required this.durationMinutes});
-
-  @override
-  Widget build(BuildContext context) {
-    final total = hourlyRate * durationMinutes / 60;
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: Theme.of(context).colorScheme.primaryContainer,
-        borderRadius: BorderRadius.circular(14),
-      ),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-        children: [
-          const Text('Valor estimado',
-              style: TextStyle(fontWeight: FontWeight.w500)),
-          Text(
-            'R\$ ${total.toStringAsFixed(2)}',
-            style: TextStyle(
-              fontWeight: FontWeight.bold,
-              fontSize: 18,
-              color: Theme.of(context).colorScheme.primary,
-            ),
-          ),
-        ],
-      ),
     );
   }
 }
