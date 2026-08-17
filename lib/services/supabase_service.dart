@@ -191,4 +191,12 @@ class SupabaseService {
         .update({'status': SessionStatus.completed.name})
         .eq('id', sessionId);
   }
+
+  /// Registra a avaliação (1–5) que o idoso deu ao voluntário na sessão.
+  Future<void> rateSession(String sessionId, double rating) async {
+    await _db
+        .from('sessions')
+        .update({'rating': rating})
+        .eq('id', sessionId);
+  }
 }
