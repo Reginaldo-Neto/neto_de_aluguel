@@ -57,6 +57,11 @@ class _ElderHome extends ConsumerWidget {
         ),
         actions: [
           IconButton(
+            icon: const Icon(Icons.history_rounded),
+            tooltip: 'Minhas conversas',
+            onPressed: () => context.push('/my-sessions'),
+          ),
+          IconButton(
             icon: Icon(themeMode == ThemeMode.dark
                 ? Icons.light_mode_rounded
                 : Icons.dark_mode_rounded),
