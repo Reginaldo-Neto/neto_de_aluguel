@@ -7,8 +7,13 @@ import 'login_presenter.dart';
 // ── Auth state (usuário logado) ──────────────────────────────────
 
 class AuthNotifier extends Notifier<UserModel?> {
+  AuthNotifier([this._initialUser]);
+
+  /// Usuário restaurado no boot (sessão persistida do Supabase), se houver.
+  final UserModel? _initialUser;
+
   @override
-  UserModel? build() => null;
+  UserModel? build() => _initialUser;
 
   void setUser(UserModel user) => state = user;
 
