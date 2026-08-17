@@ -8,6 +8,7 @@ import '../models/session.dart';
 import '../models/category.dart';
 import '../presenters/home_presenter.dart';
 import '../services/supabase_service.dart';
+import '../services/notification_service.dart';
 import '../widgets/helper_card.dart';
 import '../widgets/category_chip.dart';
 
@@ -200,6 +201,10 @@ Future<void> _startCall(
       elderId: user.id,
       helperId: helper.id,
       category: category,
+    );
+    await NotificationService().sendInstantCallInvite(
+      helperId: helper.id,
+      elderName: user.name,
     );
     ref.invalidate(userSessionsProvider);
     if (context.mounted) {
