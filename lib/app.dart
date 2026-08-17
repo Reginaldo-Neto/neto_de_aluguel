@@ -8,6 +8,7 @@ import 'views/login_view.dart';
 import 'views/home_view.dart';
 import 'views/session_view.dart';
 import 'views/video_call_view.dart';
+import 'views/my_sessions_view.dart';
 
 final themeModeProvider = StateProvider<ThemeMode>((ref) => ThemeMode.system);
 
@@ -27,6 +28,8 @@ GoRouter _buildRouter(UserModel? currentUser) {
     routes: [
       GoRoute(path: '/login', builder: (_, __) => const LoginView()),
       GoRoute(path: '/home', builder: (_, __) => const HomeView()),
+      GoRoute(
+          path: '/my-sessions', builder: (_, __) => const MySessionsView()),
       GoRoute(
         path: '/session/:helperId',
         builder: (_, state) => SessionView(helper: state.extra as UserModel),
