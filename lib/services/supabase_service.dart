@@ -144,6 +144,40 @@ class SupabaseService {
     return '$url?t=${DateTime.now().millisecondsSinceEpoch}';
   }
 
+  // ─────────────────────── Indisponibilidade ───────────────────────
+
+  /// Dias em que o voluntário marcou que NÃO vai atender.
+  Future<List<DateTime>> getUnavailableDays(String helperId) async {
+    final List<dynamic> data = await _db
+        .from('helper_unavailability')
+        .select('day')
+        .eq('helper_id', helperId)
+        .order('day');
+    return data.map((r) => DateTime.parse(r['day'] as String)).toList();
+  }
+
+  Future<void> addUnavailableDay(String helperId, DateTime day) async {
+    final iso = _dateOnly(day);
+    await _db.from('helper_unavailability').upsert(
+      {'helper_id': helperId, 'day': iso},
+      onConflict: 'helper_id,day',
+    );
+  }
+
+  Future<void> removeUnavailableDay(String helperId, DateTime day) async {
+    final iso = _dateOnly(day);
+    await _db
+        .from('helper_unavailability')
+        .delete()
+        .eq('helper_id', helperId)
+        .eq('day', iso);
+  }
+
+  String _dateOnly(DateTime d) =>
+      '${d.year.toString().padLeft(4, '0')}-'
+      '${d.month.toString().padLeft(2, '0')}-'
+      '${d.day.toString().padLeft(2, '0')}';
+
   // ──────────────────────────── Sessões ────────────────────────────
 
   Future<List<SessionModel>> getSessions({required String userId}) async {

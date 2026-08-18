@@ -204,6 +204,21 @@ class ProfileView extends HookConsumerWidget {
                   },
                 );
               }),
+              const SizedBox(height: 16),
+              Card(
+                elevation: 0,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(14),
+                  side: BorderSide(color: theme.colorScheme.outlineVariant),
+                ),
+                child: ListTile(
+                  leading: const Icon(Icons.event_busy_rounded),
+                  title: const Text('Dias em que não atendo'),
+                  subtitle: const Text('Marque suas folgas no calendário'),
+                  trailing: const Icon(Icons.chevron_right_rounded),
+                  onTap: () => context.push('/availability'),
+                ),
+              ),
             ],
             const SizedBox(height: 28),
             PrimaryButton(
