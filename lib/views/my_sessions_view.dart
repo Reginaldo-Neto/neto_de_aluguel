@@ -2,21 +2,25 @@ import 'package:flutter/material.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../models/session.dart';
+import '../models/user.dart';
 import '../services/supabase_service.dart';
 import '../presenters/home_presenter.dart';
 
-/// Histórico de conversas do idoso: lista as sessões dele (agendadas,
-/// concluídas ou canceladas), com a opção de entrar nas que estão por vir.
+/// Histórico de conversas/atendimentos do usuário logado. Serve tanto para o
+/// idoso (mostra o voluntário) quanto para o voluntário (mostra o idoso),
+/// separando em "Próximas" e "Anteriores".
 class MySessionsView extends ConsumerWidget {
   const MySessionsView({super.key});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final user = ref.watch(authProvider);
     final sessions = ref.watch(userSessionsProvider);
+    final isElder = user?.role == UserRole.elder;
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Minhas conversas'),
+        title: Text(isElder ? 'Minhas conversas' : 'Meus atendimentos'),
         leading: BackButton(onPressed: () => context.pop()),
       ),
       body: RefreshIndicator(
@@ -26,30 +30,75 @@ class MySessionsView extends ConsumerWidget {
           error: (_, __) => _ErrorState(
             onRetry: () => ref.invalidate(userSessionsProvider),
           ),
-          data: (list) => list.isEmpty
-              ? _EmptyState()
-              : ListView.separated(
-                  padding: const EdgeInsets.all(16),
-                  physics: const AlwaysScrollableScrollPhysics(),
-                  itemCount: list.length,
-                  separatorBuilder: (_, __) => const SizedBox(height: 10),
-                  itemBuilder: (context, index) =>
-                      _ElderSessionCard(session: list[index]),
-                ),
+          data: (list) {
+            if (list.isEmpty) return _EmptyState(isElder: isElder);
+
+            const upcomingStatuses = {
+              SessionStatus.pending,
+              SessionStatus.confirmed,
+              SessionStatus.inProgress,
+            };
+            final upcoming =
+                list.where((s) => upcomingStatuses.contains(s.status)).toList();
+            final past =
+                list.where((s) => !upcomingStatuses.contains(s.status)).toList();
+
+            return ListView(
+              padding: const EdgeInsets.all(16),
+              physics: const AlwaysScrollableScrollPhysics(),
+              children: [
+                if (upcoming.isNotEmpty) ...[
+                  _SectionHeader('Próximas'),
+                  const SizedBox(height: 8),
+                  ...upcoming.map((s) => Padding(
+                        padding: const EdgeInsets.only(bottom: 10),
+                        child: _SessionTile(session: s, isElder: isElder),
+                      )),
+                  const SizedBox(height: 12),
+                ],
+                if (past.isNotEmpty) ...[
+                  _SectionHeader('Anteriores'),
+                  const SizedBox(height: 8),
+                  ...past.map((s) => Padding(
+                        padding: const EdgeInsets.only(bottom: 10),
+                        child: _SessionTile(session: s, isElder: isElder),
+                      )),
+                ],
+              ],
+            );
+          },
         ),
       ),
     );
   }
 }
 
-class _ElderSessionCard extends StatelessWidget {
+class _SectionHeader extends StatelessWidget {
+  final String title;
+  const _SectionHeader(this.title);
+
+  @override
+  Widget build(BuildContext context) {
+    return Text(title,
+        style: Theme.of(context)
+            .textTheme
+            .titleMedium
+            ?.copyWith(fontWeight: FontWeight.bold));
+  }
+}
+
+class _SessionTile extends StatelessWidget {
   final SessionModel session;
-  const _ElderSessionCard({required this.session});
+  final bool isElder;
+  const _SessionTile({required this.session, required this.isElder});
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final helperName = session.helper?.name ?? 'Voluntário';
+    // A "contraparte" depende do papel de quem está olhando.
+    final other = isElder ? session.helper : session.elder;
+    final otherName = other?.name ?? (isElder ? 'Voluntário' : 'Participante');
+    final hasPhoto = other?.avatarUrl != null && other!.avatarUrl!.isNotEmpty;
 
     return Card(
       elevation: 0,
@@ -62,13 +111,17 @@ class _ElderSessionCard extends StatelessWidget {
             const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
         leading: CircleAvatar(
           backgroundColor: theme.colorScheme.primaryContainer,
-          child: Text(
-            session.helper?.initials ?? '?',
-            style: TextStyle(color: theme.colorScheme.onPrimaryContainer),
-          ),
+          backgroundImage: hasPhoto ? NetworkImage(other.avatarUrl!) : null,
+          child: hasPhoto
+              ? null
+              : Text(
+                  other?.initials ?? '?',
+                  style:
+                      TextStyle(color: theme.colorScheme.onPrimaryContainer),
+                ),
         ),
-        title: Text(helperName,
-            style: const TextStyle(fontWeight: FontWeight.bold)),
+        title:
+            Text(otherName, style: const TextStyle(fontWeight: FontWeight.bold)),
         subtitle: Text(
           '${session.category} · ${_formatDate(session.scheduledAt)}',
           style: const TextStyle(fontSize: 13),
@@ -88,7 +141,8 @@ class _ElderSessionCard extends StatelessWidget {
         child: const Text('Entrar'),
       );
     }
-    if (session.status == SessionStatus.completed) {
+    // O idoso avalia o voluntário em sessões concluídas.
+    if (isElder && session.status == SessionStatus.completed) {
       return session.rating != null
           ? _RatingDisplay(rating: session.rating!)
           : _RateButton(session: session);
@@ -196,8 +250,9 @@ class _RatingDialogState extends State<_RatingDialog> {
           child: const Text('Cancelar'),
         ),
         FilledButton(
-          onPressed:
-              _stars == 0 ? null : () => Navigator.pop(context, _stars.toDouble()),
+          onPressed: _stars == 0
+              ? null
+              : () => Navigator.pop(context, _stars.toDouble()),
           child: const Text('Enviar'),
         ),
       ],
@@ -253,23 +308,31 @@ class _StatusBadge extends StatelessWidget {
 }
 
 class _EmptyState extends StatelessWidget {
+  final bool isElder;
+  const _EmptyState({required this.isElder});
+
   @override
   Widget build(BuildContext context) {
     return ListView(
-      // ListView para permitir o pull-to-refresh mesmo vazio.
       physics: const AlwaysScrollableScrollPhysics(),
       children: [
         const SizedBox(height: 120),
-        const Center(child: Text('💬', style: TextStyle(fontSize: 48))),
+        Center(
+            child: Text(isElder ? '💬' : '📋',
+                style: const TextStyle(fontSize: 48))),
         const SizedBox(height: 12),
         Center(
-          child: Text('Nenhuma conversa ainda',
-              style: Theme.of(context).textTheme.bodyLarge),
+          child: Text(
+            isElder ? 'Nenhuma conversa ainda' : 'Nenhum atendimento ainda',
+            style: Theme.of(context).textTheme.bodyLarge,
+          ),
         ),
         const SizedBox(height: 8),
         Center(
           child: Text(
-            'Suas ligações e agendamentos aparecerão aqui.',
+            isElder
+                ? 'Suas ligações e agendamentos aparecerão aqui.'
+                : 'Seus atendimentos aparecerão aqui.',
             style: Theme.of(context).textTheme.bodySmall,
             textAlign: TextAlign.center,
           ),
@@ -290,7 +353,7 @@ class _ErrorState extends StatelessWidget {
       children: [
         const SizedBox(height: 120),
         Center(
-          child: Text('Erro ao carregar suas conversas',
+          child: Text('Erro ao carregar',
               style: Theme.of(context).textTheme.bodyLarge),
         ),
         const SizedBox(height: 12),

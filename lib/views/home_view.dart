@@ -362,6 +362,11 @@ class _HelperHome extends ConsumerWidget {
         actions: [
           _AvailabilityToggle(user: user),
           IconButton(
+            icon: const Icon(Icons.history_rounded),
+            tooltip: 'Meus atendimentos',
+            onPressed: () => context.push('/my-sessions'),
+          ),
+          IconButton(
             icon: const Icon(Icons.person_outline_rounded),
             tooltip: 'Meu perfil',
             onPressed: () => context.push('/profile'),
