@@ -12,7 +12,8 @@ class SessionModel {
   final int durationMinutes;
   final String category;
   final SessionStatus status;
-  final double? rating;
+  final double? rating; // nota do idoso ao voluntário
+  final double? elderRating; // nota do voluntário ao idoso
   final String? notes;
 
   const SessionModel({
@@ -26,6 +27,7 @@ class SessionModel {
     required this.category,
     this.status = SessionStatus.pending,
     this.rating,
+    this.elderRating,
     this.notes,
   });
 
@@ -42,6 +44,7 @@ class SessionModel {
         orElse: () => SessionStatus.pending,
       ),
       rating: (json['rating'] as num?)?.toDouble(),
+      elderRating: (json['elder_rating'] as num?)?.toDouble(),
       notes: json['notes'] as String?,
     );
   }
@@ -55,10 +58,11 @@ class SessionModel {
         'category': category,
         'status': status.name,
         'rating': rating,
+        'elder_rating': elderRating,
         'notes': notes,
       };
 
-  SessionModel copyWith({SessionStatus? status, double? rating}) {
+  SessionModel copyWith({SessionStatus? status, double? rating, double? elderRating}) {
     return SessionModel(
       id: id,
       elderId: elderId,
@@ -70,6 +74,7 @@ class SessionModel {
       category: category,
       status: status ?? this.status,
       rating: rating ?? this.rating,
+      elderRating: elderRating ?? this.elderRating,
       notes: notes,
     );
   }
@@ -86,6 +91,7 @@ class SessionModel {
       category: category,
       status: status,
       rating: rating,
+      elderRating: elderRating,
       notes: notes,
     );
   }

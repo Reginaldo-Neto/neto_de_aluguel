@@ -1,3 +1,4 @@
+import 'dart:typed_data';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../models/user.dart';
 import '../models/session.dart';
@@ -98,6 +99,85 @@ class SupabaseService {
         .eq('id', userId);
   }
 
+  /// Atualiza dados editáveis do perfil (nome, bio, valor/hora).
+  Future<void> updateProfile({
+    required String userId,
+    String? name,
+    String? bio,
+    double? hourlyRate,
+  }) async {
+    final updates = <String, dynamic>{};
+    if (name != null) updates['name'] = name;
+    if (bio != null) updates['bio'] = bio;
+    if (hourlyRate != null) updates['hourly_rate'] = hourlyRate;
+    if (updates.isEmpty) return;
+    await _db.from('profiles').update(updates).eq('id', userId);
+  }
+
+  /// Atualiza a URL do avatar do perfil.
+  Future<void> updateAvatarUrl(String userId, String avatarUrl) async {
+    await _db
+        .from('profiles')
+        .update({'avatar_url': avatarUrl})
+        .eq('id', userId);
+  }
+
+  /// Envia a foto para o bucket "avatars" e retorna a URL pública.
+  /// O arquivo é salvo em `<userId>/avatar.<ext>` (a policy amarra a pasta
+  /// ao dono). Adiciona um parâmetro anti-cache para forçar o refresh.
+  Future<String> uploadAvatar({
+    required String userId,
+    required Uint8List bytes,
+    required String fileExt,
+  }) async {
+    final ext = fileExt.toLowerCase();
+    final contentType = ext == 'png' ? 'image/png' : 'image/jpeg';
+    final path = '$userId/avatar.$ext';
+
+    await _db.storage.from('avatars').uploadBinary(
+          path,
+          bytes,
+          fileOptions: FileOptions(upsert: true, contentType: contentType),
+        );
+
+    final url = _db.storage.from('avatars').getPublicUrl(path);
+    return '$url?t=${DateTime.now().millisecondsSinceEpoch}';
+  }
+
+  // ─────────────────────── Indisponibilidade ───────────────────────
+
+  /// Dias em que o voluntário marcou que NÃO vai atender.
+  Future<List<DateTime>> getUnavailableDays(String helperId) async {
+    final List<dynamic> data = await _db
+        .from('helper_unavailability')
+        .select('day')
+        .eq('helper_id', helperId)
+        .order('day');
+    return data.map((r) => DateTime.parse(r['day'] as String)).toList();
+  }
+
+  Future<void> addUnavailableDay(String helperId, DateTime day) async {
+    final iso = _dateOnly(day);
+    await _db.from('helper_unavailability').upsert(
+      {'helper_id': helperId, 'day': iso},
+      onConflict: 'helper_id,day',
+    );
+  }
+
+  Future<void> removeUnavailableDay(String helperId, DateTime day) async {
+    final iso = _dateOnly(day);
+    await _db
+        .from('helper_unavailability')
+        .delete()
+        .eq('helper_id', helperId)
+        .eq('day', iso);
+  }
+
+  String _dateOnly(DateTime d) =>
+      '${d.year.toString().padLeft(4, '0')}-'
+      '${d.month.toString().padLeft(2, '0')}-'
+      '${d.day.toString().padLeft(2, '0')}';
+
   // ──────────────────────────── Sessões ────────────────────────────
 
   Future<List<SessionModel>> getSessions({required String userId}) async {
@@ -197,6 +277,22 @@ class SupabaseService {
     await _db
         .from('sessions')
         .update({'rating': rating})
+        .eq('id', sessionId);
+  }
+
+  /// Registra a avaliação (1–5) que o voluntário deu ao idoso na sessão.
+  Future<void> rateElder(String sessionId, double rating) async {
+    await _db
+        .from('sessions')
+        .update({'elder_rating': rating})
+        .eq('id', sessionId);
+  }
+
+  /// Salva as anotações de um atendimento.
+  Future<void> updateSessionNotes(String sessionId, String notes) async {
+    await _db
+        .from('sessions')
+        .update({'notes': notes})
         .eq('id', sessionId);
   }
 }

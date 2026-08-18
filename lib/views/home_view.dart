@@ -1,11 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
-import 'package:flutter_hooks/flutter_hooks.dart';
 import 'package:go_router/go_router.dart';
 import '../app.dart';
 import '../models/user.dart';
 import '../models/session.dart';
-import '../models/category.dart';
 import '../presenters/home_presenter.dart';
 import '../services/supabase_service.dart';
 import '../services/notification_service.dart';
@@ -364,9 +362,14 @@ class _HelperHome extends ConsumerWidget {
         actions: [
           _AvailabilityToggle(user: user),
           IconButton(
-            icon: const Icon(Icons.category_outlined),
-            tooltip: 'Minhas especialidades',
-            onPressed: () => _showCategorySetup(context, ref, user),
+            icon: const Icon(Icons.history_rounded),
+            tooltip: 'Meus atendimentos',
+            onPressed: () => context.push('/my-sessions'),
+          ),
+          IconButton(
+            icon: const Icon(Icons.person_outline_rounded),
+            tooltip: 'Meu perfil',
+            onPressed: () => context.push('/profile'),
           ),
           IconButton(
             icon: Icon(themeMode == ThemeMode.dark
@@ -392,7 +395,7 @@ class _HelperHome extends ConsumerWidget {
           _StatsRow(user: user),
           if (user.categories.isEmpty || user.categories.every((c) => c == 'Geral'))
             _NoCategoriesBanner(
-              onTap: () => _showCategorySetup(context, ref, user),
+              onTap: () => context.push('/profile'),
             ),
           const SizedBox(height: 8),
           Expanded(
@@ -414,122 +417,6 @@ class _HelperHome extends ConsumerWidget {
           ),
         ],
       ),
-    );
-  }
-}
-
-void _showCategorySetup(BuildContext context, WidgetRef ref, UserModel user) {
-  showModalBottomSheet(
-    context: context,
-    isScrollControlled: true,
-    shape: const RoundedRectangleBorder(
-      borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
-    ),
-    builder: (_) => _CategorySetupSheet(user: user),
-  );
-}
-
-class _CategorySetupSheet extends HookConsumerWidget {
-  final UserModel user;
-  const _CategorySetupSheet({required this.user});
-
-  @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final specialCategories =
-        mockCategories.where((c) => c.name != 'Geral').toList();
-    final selected = useState<Set<String>>(
-        Set.from(user.categories.where((c) => c != 'Geral')));
-    final isLoading = useState(false);
-
-    Future<void> save() async {
-      isLoading.value = true;
-      final categories = selected.value.toList();
-      await SupabaseService().updateCategories(user.id, categories);
-      ref.read(authProvider.notifier).setCategories(categories);
-      isLoading.value = false;
-      if (context.mounted) Navigator.of(context).pop();
-    }
-
-    return DraggableScrollableSheet(
-      initialChildSize: 0.75,
-      maxChildSize: 0.95,
-      minChildSize: 0.5,
-      expand: false,
-      builder: (_, scrollController) {
-        return Padding(
-          padding: EdgeInsets.fromLTRB(
-              24, 16, 24, MediaQuery.of(context).viewInsets.bottom + 24),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Center(
-                child: Container(
-                  width: 40,
-                  height: 4,
-                  decoration: BoxDecoration(
-                    color: Colors.grey.shade300,
-                    borderRadius: BorderRadius.circular(2),
-                  ),
-                ),
-              ),
-              const SizedBox(height: 20),
-              Text('Minhas especialidades',
-                  style: Theme.of(context)
-                      .textTheme
-                      .titleLarge
-                      ?.copyWith(fontWeight: FontWeight.bold)),
-              const SizedBox(height: 8),
-              Text(
-                'Você já aparece na categoria "Geral" automaticamente. '
-                'Selecione suas especialidades para aparecer em mais categorias.',
-                style: Theme.of(context).textTheme.bodySmall,
-              ),
-              const SizedBox(height: 16),
-              Expanded(
-                child: ListView(
-                  controller: scrollController,
-                  children: specialCategories.map((cat) {
-                    final isSelected = selected.value.contains(cat.name);
-                    return CheckboxListTile(
-                      title: Text('${cat.emoji}  ${cat.name}',
-                          style: const TextStyle(fontWeight: FontWeight.w500)),
-                      subtitle: Text(cat.description),
-                      value: isSelected,
-                      activeColor: cat.color,
-                      shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(12)),
-                      onChanged: (v) {
-                        final newSet = Set<String>.from(selected.value);
-                        if (v == true) {
-                          newSet.add(cat.name);
-                        } else {
-                          newSet.remove(cat.name);
-                        }
-                        selected.value = newSet;
-                      },
-                    );
-                  }).toList(),
-                ),
-              ),
-              const SizedBox(height: 16),
-              SizedBox(
-                width: double.infinity,
-                height: 52,
-                child: FilledButton(
-                  onPressed: isLoading.value ? null : save,
-                  child: isLoading.value
-                      ? const SizedBox(
-                          width: 20,
-                          height: 20,
-                          child: CircularProgressIndicator(
-                              color: Colors.white, strokeWidth: 2))
-                      : const Text('Salvar especialidades'),
-                ),
-              ),
-            ],
-          ),
-        );
-      },
     );
   }
 }
