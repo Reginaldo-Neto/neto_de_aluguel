@@ -1,3 +1,4 @@
+import 'dart:typed_data';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../models/user.dart';
 import '../models/session.dart';
@@ -119,6 +120,28 @@ class SupabaseService {
         .from('profiles')
         .update({'avatar_url': avatarUrl})
         .eq('id', userId);
+  }
+
+  /// Envia a foto para o bucket "avatars" e retorna a URL pública.
+  /// O arquivo é salvo em `<userId>/avatar.<ext>` (a policy amarra a pasta
+  /// ao dono). Adiciona um parâmetro anti-cache para forçar o refresh.
+  Future<String> uploadAvatar({
+    required String userId,
+    required Uint8List bytes,
+    required String fileExt,
+  }) async {
+    final ext = fileExt.toLowerCase();
+    final contentType = ext == 'png' ? 'image/png' : 'image/jpeg';
+    final path = '$userId/avatar.$ext';
+
+    await _db.storage.from('avatars').uploadBinary(
+          path,
+          bytes,
+          fileOptions: FileOptions(upsert: true, contentType: contentType),
+        );
+
+    final url = _db.storage.from('avatars').getPublicUrl(path);
+    return '$url?t=${DateTime.now().millisecondsSinceEpoch}';
   }
 
   // ──────────────────────────── Sessões ────────────────────────────

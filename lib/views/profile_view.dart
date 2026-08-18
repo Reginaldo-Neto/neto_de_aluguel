@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'package:flutter_hooks/flutter_hooks.dart';
 import 'package:go_router/go_router.dart';
+import 'package:image_picker/image_picker.dart';
 import '../models/user.dart';
 import '../models/category.dart';
 import '../presenters/home_presenter.dart';
@@ -28,6 +29,51 @@ class ProfileView extends HookConsumerWidget {
     final categories = useState<Set<String>>(
         Set.from(user.categories.where((c) => c != 'Geral')));
     final isLoading = useState(false);
+    final isUploadingPhoto = useState(false);
+
+    Future<void> pickAndUploadPhoto() async {
+      final picker = ImagePicker();
+      final XFile? file = await picker.pickImage(
+        source: ImageSource.gallery,
+        maxWidth: 512,
+        imageQuality: 80,
+      );
+      if (file == null) return;
+
+      isUploadingPhoto.value = true;
+      try {
+        final bytes = await file.readAsBytes();
+        final ext = file.name.contains('.')
+            ? file.name.split('.').last.toLowerCase()
+            : 'jpg';
+        final url = await SupabaseService().uploadAvatar(
+          userId: user.id,
+          bytes: bytes,
+          fileExt: ext,
+        );
+        await SupabaseService().updateAvatarUrl(user.id, url);
+        ref.read(authProvider.notifier).updateProfile(avatarUrl: url);
+        if (context.mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Foto atualizada!'),
+              behavior: SnackBarBehavior.floating,
+            ),
+          );
+        }
+      } catch (_) {
+        if (context.mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Não foi possível enviar a foto.'),
+              behavior: SnackBarBehavior.floating,
+            ),
+          );
+        }
+      } finally {
+        isUploadingPhoto.value = false;
+      }
+    }
 
     Future<void> save() async {
       isLoading.value = true;
@@ -84,7 +130,13 @@ class ProfileView extends HookConsumerWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Center(child: _Avatar(user: user)),
+            Center(
+              child: _AvatarEditor(
+                user: user,
+                isUploading: isUploadingPhoto.value,
+                onEdit: pickAndUploadPhoto,
+              ),
+            ),
             const SizedBox(height: 28),
             _Label('Nome'),
             const SizedBox(height: 8),
@@ -167,28 +219,57 @@ class ProfileView extends HookConsumerWidget {
   }
 }
 
-class _Avatar extends StatelessWidget {
+class _AvatarEditor extends StatelessWidget {
   final UserModel user;
-  const _Avatar({required this.user});
+  final bool isUploading;
+  final VoidCallback onEdit;
+  const _AvatarEditor({
+    required this.user,
+    required this.isUploading,
+    required this.onEdit,
+  });
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final hasPhoto = user.avatarUrl != null && user.avatarUrl!.isNotEmpty;
-    return CircleAvatar(
-      radius: 48,
-      backgroundColor: theme.colorScheme.primaryContainer,
-      backgroundImage: hasPhoto ? NetworkImage(user.avatarUrl!) : null,
-      child: hasPhoto
-          ? null
-          : Text(
-              user.initials,
-              style: TextStyle(
-                fontSize: 32,
-                fontWeight: FontWeight.bold,
-                color: theme.colorScheme.onPrimaryContainer,
+    return Stack(
+      children: [
+        CircleAvatar(
+          radius: 48,
+          backgroundColor: theme.colorScheme.primaryContainer,
+          backgroundImage: hasPhoto ? NetworkImage(user.avatarUrl!) : null,
+          child: isUploading
+              ? const CircularProgressIndicator()
+              : hasPhoto
+                  ? null
+                  : Text(
+                      user.initials,
+                      style: TextStyle(
+                        fontSize: 32,
+                        fontWeight: FontWeight.bold,
+                        color: theme.colorScheme.onPrimaryContainer,
+                      ),
+                    ),
+        ),
+        Positioned(
+          right: 0,
+          bottom: 0,
+          child: Material(
+            color: theme.colorScheme.primary,
+            shape: const CircleBorder(),
+            child: InkWell(
+              customBorder: const CircleBorder(),
+              onTap: isUploading ? null : onEdit,
+              child: const Padding(
+                padding: EdgeInsets.all(8),
+                child: Icon(Icons.camera_alt_rounded,
+                    color: Colors.white, size: 18),
               ),
             ),
+          ),
+        ),
+      ],
     );
   }
 }

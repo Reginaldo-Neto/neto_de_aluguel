@@ -102,19 +102,23 @@ class _Avatar extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final hasPhoto = helper.avatarUrl != null && helper.avatarUrl!.isNotEmpty;
     return Stack(
       children: [
         CircleAvatar(
           radius: 28,
           backgroundColor: theme.colorScheme.primaryContainer,
-          child: Text(
-            helper.initials,
-            style: TextStyle(
-              fontSize: 18,
-              fontWeight: FontWeight.bold,
-              color: theme.colorScheme.onPrimaryContainer,
-            ),
-          ),
+          backgroundImage: hasPhoto ? NetworkImage(helper.avatarUrl!) : null,
+          child: hasPhoto
+              ? null
+              : Text(
+                  helper.initials,
+                  style: TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.bold,
+                    color: theme.colorScheme.onPrimaryContainer,
+                  ),
+                ),
         ),
         if (helper.isAvailable)
           Positioned(
