@@ -280,6 +280,14 @@ class SupabaseService {
         .eq('id', sessionId);
   }
 
+  /// Registra a avaliação (1–5) que o voluntário deu ao idoso na sessão.
+  Future<void> rateElder(String sessionId, double rating) async {
+    await _db
+        .from('sessions')
+        .update({'elder_rating': rating})
+        .eq('id', sessionId);
+  }
+
   /// Salva as anotações de um atendimento.
   Future<void> updateSessionNotes(String sessionId, String notes) async {
     await _db

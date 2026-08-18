@@ -180,11 +180,16 @@ class _SessionTile extends ConsumerWidget {
         child: const Text('Entrar'),
       );
     }
-    // O idoso avalia o voluntário em sessões concluídas.
-    if (isElder && session.status == SessionStatus.completed) {
-      return session.rating != null
-          ? _RatingDisplay(rating: session.rating!)
-          : _RateButton(session: session);
+    // Avaliação mútua em sessões concluídas.
+    if (session.status == SessionStatus.completed) {
+      if (isElder) {
+        return session.rating != null
+            ? _RatingDisplay(rating: session.rating!)
+            : _RateButton(session: session);
+      }
+      return session.elderRating != null
+          ? _RatingDisplay(rating: session.elderRating!)
+          : _RateButton(session: session, rateElder: true);
     }
     return _StatusBadge(status: session.status);
   }
@@ -266,25 +271,33 @@ class _NotesDialogState extends State<_NotesDialog> {
 }
 
 /// Botão "Avaliar" que abre o seletor de estrelas e grava a nota.
+/// Com [rateElder] true, o voluntário avalia o idoso; caso contrário, o idoso
+/// avalia o voluntário.
 class _RateButton extends ConsumerWidget {
   final SessionModel session;
-  const _RateButton({required this.session});
+  final bool rateElder;
+  const _RateButton({required this.session, this.rateElder = false});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final targetName = rateElder
+        ? (session.elder?.name ?? 'participante')
+        : (session.helper?.name ?? 'voluntário');
     return TextButton.icon(
       icon: const Icon(Icons.star_outline_rounded, size: 18),
       label: const Text('Avaliar'),
       onPressed: () async {
         final rating = await showDialog<double>(
           context: context,
-          builder: (_) => _RatingDialog(
-            helperName: session.helper?.name ?? 'voluntário',
-          ),
+          builder: (_) => _RatingDialog(targetName: targetName),
         );
         if (rating == null) return;
         try {
-          await SupabaseService().rateSession(session.id, rating);
+          if (rateElder) {
+            await SupabaseService().rateElder(session.id, rating);
+          } else {
+            await SupabaseService().rateSession(session.id, rating);
+          }
           ref.invalidate(userSessionsProvider);
         } catch (_) {
           if (context.mounted) {
@@ -322,8 +335,8 @@ class _RatingDisplay extends StatelessWidget {
 
 /// Diálogo com 5 estrelas; retorna a nota escolhida (1–5) via Navigator.pop.
 class _RatingDialog extends StatefulWidget {
-  final String helperName;
-  const _RatingDialog({required this.helperName});
+  final String targetName;
+  const _RatingDialog({required this.targetName});
 
   @override
   State<_RatingDialog> createState() => _RatingDialogState();
@@ -335,7 +348,7 @@ class _RatingDialogState extends State<_RatingDialog> {
   @override
   Widget build(BuildContext context) {
     return AlertDialog(
-      title: Text('Avaliar ${widget.helperName}'),
+      title: Text('Avaliar ${widget.targetName}'),
       content: Row(
         mainAxisSize: MainAxisSize.min,
         mainAxisAlignment: MainAxisAlignment.center,
