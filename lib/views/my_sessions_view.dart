@@ -87,18 +87,21 @@ class _SectionHeader extends StatelessWidget {
   }
 }
 
-class _SessionTile extends StatelessWidget {
+class _SessionTile extends ConsumerWidget {
   final SessionModel session;
   final bool isElder;
   const _SessionTile({required this.session, required this.isElder});
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final theme = Theme.of(context);
     // A "contraparte" depende do papel de quem está olhando.
     final other = isElder ? session.helper : session.elder;
     final otherName = other?.name ?? (isElder ? 'Voluntário' : 'Participante');
     final hasPhoto = other?.avatarUrl != null && other!.avatarUrl!.isNotEmpty;
+    final isPast = session.status == SessionStatus.completed ||
+        session.status == SessionStatus.cancelled;
+    final hasNotes = session.notes != null && session.notes!.trim().isNotEmpty;
 
     return Card(
       elevation: 0,
@@ -109,6 +112,7 @@ class _SessionTile extends StatelessWidget {
       child: ListTile(
         contentPadding:
             const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+        onTap: isPast ? () => _editNotes(context, ref) : null,
         leading: CircleAvatar(
           backgroundColor: theme.colorScheme.primaryContainer,
           backgroundImage: hasPhoto ? NetworkImage(other.avatarUrl!) : null,
@@ -122,9 +126,44 @@ class _SessionTile extends StatelessWidget {
         ),
         title:
             Text(otherName, style: const TextStyle(fontWeight: FontWeight.bold)),
-        subtitle: Text(
-          '${session.category} · ${_formatDate(session.scheduledAt)}',
-          style: const TextStyle(fontSize: 13),
+        isThreeLine: isPast,
+        subtitle: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(
+              '${session.category} · ${_formatDate(session.scheduledAt)}',
+              style: const TextStyle(fontSize: 13),
+            ),
+            if (hasNotes)
+              Padding(
+                padding: const EdgeInsets.only(top: 2),
+                child: Row(
+                  children: [
+                    const Icon(Icons.sticky_note_2_outlined, size: 14),
+                    const SizedBox(width: 4),
+                    Expanded(
+                      child: Text(
+                        session.notes!.trim(),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(fontSize: 12),
+                      ),
+                    ),
+                  ],
+                ),
+              )
+            else if (isPast)
+              Padding(
+                padding: const EdgeInsets.only(top: 2),
+                child: Text(
+                  'Toque para adicionar anotação',
+                  style: TextStyle(
+                      fontSize: 12,
+                      color: theme.colorScheme.onSurfaceVariant),
+                ),
+              ),
+          ],
         ),
         trailing: _buildTrailing(context),
       ),
@@ -154,6 +193,75 @@ class _SessionTile extends StatelessWidget {
     return '${dt.day}/${dt.month} às '
         '${dt.hour.toString().padLeft(2, '0')}:'
         '${dt.minute.toString().padLeft(2, '0')}';
+  }
+
+  Future<void> _editNotes(BuildContext context, WidgetRef ref) async {
+    final result = await showDialog<String>(
+      context: context,
+      builder: (_) => _NotesDialog(initial: session.notes ?? ''),
+    );
+    if (result == null) return;
+    try {
+      await SupabaseService().updateSessionNotes(session.id, result);
+      ref.invalidate(userSessionsProvider);
+    } catch (_) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Não foi possível salvar a anotação.'),
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+      }
+    }
+  }
+}
+
+/// Diálogo de anotações do atendimento; retorna o texto via Navigator.pop.
+class _NotesDialog extends StatefulWidget {
+  final String initial;
+  const _NotesDialog({required this.initial});
+
+  @override
+  State<_NotesDialog> createState() => _NotesDialogState();
+}
+
+class _NotesDialogState extends State<_NotesDialog> {
+  late final TextEditingController _controller =
+      TextEditingController(text: widget.initial);
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      title: const Text('Anotações'),
+      content: TextField(
+        controller: _controller,
+        minLines: 3,
+        maxLines: 6,
+        maxLength: 500,
+        autofocus: true,
+        decoration: const InputDecoration(
+          hintText: 'Escreva suas anotações sobre este atendimento',
+          alignLabelWithHint: true,
+        ),
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.pop(context),
+          child: const Text('Cancelar'),
+        ),
+        FilledButton(
+          onPressed: () => Navigator.pop(context, _controller.text.trim()),
+          child: const Text('Salvar'),
+        ),
+      ],
+    );
   }
 }
 

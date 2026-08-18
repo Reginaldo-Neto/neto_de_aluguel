@@ -279,4 +279,12 @@ class SupabaseService {
         .update({'rating': rating})
         .eq('id', sessionId);
   }
+
+  /// Salva as anotações de um atendimento.
+  Future<void> updateSessionNotes(String sessionId, String notes) async {
+    await _db
+        .from('sessions')
+        .update({'notes': notes})
+        .eq('id', sessionId);
+  }
 }
