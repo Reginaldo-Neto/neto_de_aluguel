@@ -63,13 +63,14 @@ class UserModel {
     List<String>? categories,
     String? bio,
     double? hourlyRate,
+    String? avatarUrl,
   }) {
     return UserModel(
       id: id,
       name: name ?? this.name,
       email: email,
       role: role,
-      avatarUrl: avatarUrl,
+      avatarUrl: avatarUrl ?? this.avatarUrl,
       categories: categories ?? this.categories,
       rating: rating,
       totalSessions: totalSessions,

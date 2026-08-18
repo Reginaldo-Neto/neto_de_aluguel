@@ -98,6 +98,29 @@ class SupabaseService {
         .eq('id', userId);
   }
 
+  /// Atualiza dados editáveis do perfil (nome, bio, valor/hora).
+  Future<void> updateProfile({
+    required String userId,
+    String? name,
+    String? bio,
+    double? hourlyRate,
+  }) async {
+    final updates = <String, dynamic>{};
+    if (name != null) updates['name'] = name;
+    if (bio != null) updates['bio'] = bio;
+    if (hourlyRate != null) updates['hourly_rate'] = hourlyRate;
+    if (updates.isEmpty) return;
+    await _db.from('profiles').update(updates).eq('id', userId);
+  }
+
+  /// Atualiza a URL do avatar do perfil.
+  Future<void> updateAvatarUrl(String userId, String avatarUrl) async {
+    await _db
+        .from('profiles')
+        .update({'avatar_url': avatarUrl})
+        .eq('id', userId);
+  }
+
   // ──────────────────────────── Sessões ────────────────────────────
 
   Future<List<SessionModel>> getSessions({required String userId}) async {

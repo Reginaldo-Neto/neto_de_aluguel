@@ -33,6 +33,22 @@ class AuthNotifier extends Notifier<UserModel?> {
     if (state == null) return;
     state = state!.copyWith(categories: categories);
   }
+
+  /// Aplica no estado as edições de perfil (nome, bio, valor/hora, avatar).
+  void updateProfile({
+    String? name,
+    String? bio,
+    double? hourlyRate,
+    String? avatarUrl,
+  }) {
+    if (state == null) return;
+    state = state!.copyWith(
+      name: name,
+      bio: bio,
+      hourlyRate: hourlyRate,
+      avatarUrl: avatarUrl,
+    );
+  }
 }
 
 final authProvider = NotifierProvider<AuthNotifier, UserModel?>(AuthNotifier.new);
